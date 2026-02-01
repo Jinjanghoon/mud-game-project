@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import './App.css'; 
 
-// 🚨 Railway 주소 확인!
+// 🚨 본인의 Railway 주소 확인!
 const socket = io.connect("https://mud-game-project-production.up.railway.app");
 
 function App() {
@@ -13,11 +13,33 @@ function App() {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+  // 🤖 자동 사냥 상태 (true면 사냥 중)
+  const [isAutoHunting, setIsAutoHunting] = useState(false);
+
   const logEndRef = useRef(null);
 
+  // 로그 자동 스크롤
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
+
+  // 🤖 자동 사냥 로직 (핵심!)
+  useEffect(() => {
+    let timer;
+    if (isAutoHunting) {
+      // 1. 체력이 있는지 확인
+      if (status && status.hp > 0) {
+        timer = setTimeout(() => {
+          socket.emit('req_hunt'); // 1초 뒤 사냥 요청
+        }, 1000); // 속도 조절 (1000 = 1초)
+      } else {
+        // 체력 없으면 자동 사냥 종료
+        setIsAutoHunting(false);
+        alert("체력이 부족하여 자동 사냥을 종료합니다.");
+      }
+    }
+    return () => clearTimeout(timer); // 정리(Clean-up)
+  }, [isAutoHunting, status]); // 상태가 변할 때마다 실행
 
   useEffect(() => {
     socket.on('log_message', (msg) => setLogs((prev) => [...prev, msg]));
@@ -42,23 +64,36 @@ function App() {
 
   const handleLogin = () => socket.emit('req_login', { id: inputId, pw: inputPw });
   const handleRegister = () => socket.emit('req_register', { id: inputId, pw: inputPw });
-  const handleHunt = () => socket.emit('req_hunt');
+  
+  // 수동 사냥 (자동 사냥 중에는 클릭 방지)
+  const handleHunt = () => {
+    if (!isAutoHunting) socket.emit('req_hunt');
+  };
+
   const handleRest = () => socket.emit('req_rest');
+  
   const handleLogout = () => {
     localStorage.removeItem('savedId');
     localStorage.removeItem('savedPw');
     window.location.reload();
   };
 
+  // 자동 사냥 토글 버튼
+  const toggleAutoHunt = () => {
+    if (status?.hp <= 0) {
+      return alert("체력이 부족합니다! 휴식하세요.");
+    }
+    setIsAutoHunting(!isAutoHunting);
+  };
+
   return (
     <div className="app-container">
-      {/* 헤더: 항상 화면 상단에 떠 있음 */}
       <header className="header">
         <h1 className="title">TEXT FOREST ONLINE</h1>
       </header>
 
       {!isLoggedIn ? (
-        // [로그인 화면] - 박스 없이 전체 화면 중앙 배치
+        // [로그인 화면]
         <div className="login-wrapper">
           <div className="login-box">
             <h2 style={{color:'white', marginBottom:'10px', fontSize:'2rem'}}>
@@ -96,9 +131,9 @@ function App() {
           </div>
         </div>
       ) : (
-        // [인게임 화면] - PC에선 넓게, 모바일에선 꽉 차게
+        // [인게임 화면]
         <div className="game-layout">
-          {/* 좌측: 상태창 + 컨트롤 */}
+          {/* 좌측 패널 */}
           <div className="dashboard">
             <div className="status-card">
               <div className="stat-row">
@@ -122,13 +157,25 @@ function App() {
             </div>
 
             <div className="control-panel" style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-              <button className="btn btn-atk" onClick={handleHunt}>⚔️ 사냥하기</button>
+              {/* 자동 사냥 버튼으로 교체 */}
+              <button 
+                className="btn" 
+                style={{
+                  background: isAutoHunting ? '#e06c75' : 'linear-gradient(135deg, #e06c75, #c14650)',
+                  border: isAutoHunting ? '2px solid white' : 'none',
+                  animation: isAutoHunting ? 'pulse 1s infinite' : 'none'
+                }} 
+                onClick={toggleAutoHunt}
+              >
+                {isAutoHunting ? "⏹ 자동사냥 중지 (ON)" : "⚔️ 자동사냥 시작 (OFF)"}
+              </button>
+
               <button className="btn btn-rest" onClick={handleRest}>💤 휴식하기</button>
               <button className="btn btn-out" onClick={handleLogout}>로그아웃</button>
             </div>
           </div>
 
-          {/* 우측: 로그창 */}
+          {/* 우측 로그창 */}
           <div className="log-window">
             {logs.length === 0 && <div style={{textAlign:'center', color:'#555', marginTop:'100px'}}>- 모험의 기록이 여기에 표시됩니다 -</div>}
             {logs.map((log, idx) => (
