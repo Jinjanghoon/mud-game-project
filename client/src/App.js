@@ -16,6 +16,9 @@ function App() {
   // 🤖 자동 사냥 상태
   const [isAutoHunting, setIsAutoHunting] = useState(false);
 
+  // 🛑 중복 실행 방지용 (자동 로그인 체크)
+  const autoLoginAttempted = useRef(false);
+  
   const logEndRef = useRef(null);
 
   // 로그 자동 스크롤
@@ -39,28 +42,28 @@ function App() {
     return () => clearTimeout(timer); 
   }, [isAutoHunting, status]); 
 
-  // 👂 [핵심 수정] 서버 메시지 듣는 리스너 (딱 1번만 실행되게 수정함)
+  // 👂 서버 메시지 리스너 (중복 방지 처리됨)
   useEffect(() => {
-    // 1. 이벤트 핸들러 정의
     const handleLog = (msg) => setLogs((prev) => [...prev, msg]);
     const handleStatus = (data) => setStatus(data);
     const handleLoginSuccess = (data) => {
       setIsLoggedIn(true);
       setStatus(data);
       localStorage.setItem('savedId', data.name);
-      // 비밀번호는 inputPw 상태가 아니라 로컬스토리지 값을 우선시해야 함 (여기선 간단히 처리)
+      // 저장된 비번이 있으면 갱신, 없으면 입력된 값 저장
+      if (inputPw) localStorage.setItem('savedPw', inputPw);
     };
     const handleLoginFail = (msg) => alert(msg);
     const handleRegisterSuccess = (msg) => { alert(msg); setIsLoginMode(true); };
 
-    // 2. 리스너 등록 (귀 열기)
+    // 리스너 등록
     socket.on('log_message', handleLog);
     socket.on('update_status', handleStatus);
     socket.on('login_success', handleLoginSuccess);
     socket.on('login_fail', handleLoginFail);
     socket.on('register_success', handleRegisterSuccess);
 
-    // 3. 뒷정리 함수 (귀 닫기) - 컴포넌트가 사라지거나 재실행될 때 중복 방지
+    // 뒷정리 (기존 리스너 제거)
     return () => {
       socket.off('log_message', handleLog);
       socket.off('update_status', handleStatus);
@@ -68,21 +71,27 @@ function App() {
       socket.off('login_fail', handleLoginFail);
       socket.off('register_success', handleRegisterSuccess);
     };
-  }, []); // ✅ 여기가 비어있어야([]), 처음에 딱 한 번만 실행됨!
+  }, [inputPw]); // inputPw 의존성 유지 (로그인 성공 시 저장을 위해)
 
-  // 앱 켜자마자 자동 로그인 시도 (별도 useEffect로 분리)
+  // 🚀 앱 켜자마자 자동 로그인 (딱 1번만 실행되게 수정!)
   useEffect(() => {
+    // 이미 시도했으면 중단 (Strict Mode 중복 방지)
+    if (autoLoginAttempted.current) return;
+
     const savedId = localStorage.getItem('savedId');
     const savedPw = localStorage.getItem('savedPw');
+    
     if (savedId && savedPw) {
+      // 자동 로그인 시도
       setInputId(savedId);
       setInputPw(savedPw);
       socket.emit('req_login', { id: savedId, pw: savedPw });
+      autoLoginAttempted.current = true; // "시도 했음" 표시
     }
   }, []);
 
   const handleLogin = () => {
-    // 로그인 성공 시에만 저장하도록 로직 변경 필요하지만, 편의상 여기서 저장
+    // 수동 로그인 시 저장
     localStorage.setItem('savedPw', inputPw); 
     socket.emit('req_login', { id: inputId, pw: inputPw });
   };
