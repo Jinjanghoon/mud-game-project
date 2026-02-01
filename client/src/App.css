@@ -168,3 +168,64 @@ input:focus {
 .text-battle { color: #ff8e99; text-shadow: 0 0 5px rgba(255, 142, 153, 0.3); }
 .text-system { color: #d19a66; }
 .text-link { color: #56b6c2; cursor: pointer; margin-top: 20px; display: inline-block; font-size: 0.9rem;}
+
+/* ... 기존 위쪽 코드는 그대로 두셔도 됩니다 (body, .app-container 등) ... */
+
+/* 상태창 카드 스타일 */
+.status-card {
+  background-color: #2c313a;
+  padding: 15px;
+  border-radius: 12px;
+  border: 1px solid #3e4451;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+/* ★ 게이지 바 디자인 (변경됨) ★ */
+.bar-container {
+  position: relative; /* 글자를 위에 띄우기 위한 기준점 */
+  background-color: #181a1f; /* 빈 게이지 색상 (진한 회색) */
+  height: 24px; /* 글씨가 들어가야 해서 조금 두껍게 */
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.5); /* 안쪽 그림자로 깊이감 */
+}
+
+/* 채워지는 막대 */
+.hp-bar { 
+  background: linear-gradient(90deg, #e06c75, #ff8e99); 
+  height: 100%; 
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+}
+
+.exp-bar { 
+  background: linear-gradient(90deg, #e5c07b, #f0e68c); 
+  height: 100%; 
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+}
+
+/* ★ 게이지 안쪽 텍스트 (중앙 정렬) ★ */
+.bar-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* 정중앙 정렬 */
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8); /* 글자 잘 보이게 그림자 */
+  z-index: 2; /* 막대보다 위에 뜨게 */
+}
+
+/* ... 나머지 버튼, 로그창 스타일은 기존 유지 ... */

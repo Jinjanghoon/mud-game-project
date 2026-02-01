@@ -10,8 +10,6 @@ function App() {
   const [status, setStatus] = useState(null);
   const [mapList, setMapList] = useState([]); 
   const [currentMapId, setCurrentMapId] = useState(0); 
-
-  // 현재 선택된 몬스터 (자동사냥 타겟)
   const [targetMonsterIdx, setTargetMonsterIdx] = useState(0);
 
   const [inputId, setInputId] = useState("");
@@ -24,18 +22,16 @@ function App() {
   const autoLoginAttempted = useRef(false);
   const logEndRef = useRef(null);
 
-  // 비밀번호 Ref 동기화
   useEffect(() => { inputPwRef.current = inputPw; }, [inputPw]);
-  // 로그 스크롤
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
 
-  // 🤖 자동 사냥 (선택된 몬스터만 공격)
+  // 🤖 자동 사냥
   useEffect(() => {
     let timer;
     if (isAutoHunting) {
       if (status && status.hp > 0) {
         timer = setTimeout(() => {
-          socket.emit('req_hunt', targetMonsterIdx); // 타겟 인덱스 전송
+          socket.emit('req_hunt', targetMonsterIdx);
         }, 1000); 
       } else {
         setIsAutoHunting(false);
@@ -43,7 +39,7 @@ function App() {
       }
     }
     return () => clearTimeout(timer); 
-  }, [isAutoHunting, status, targetMonsterIdx]); // 타겟이 바뀌면 그 놈을 때림
+  }, [isAutoHunting, status, targetMonsterIdx]);
 
   // 👂 이벤트 리스너
   useEffect(() => {
@@ -56,20 +52,17 @@ function App() {
 
     const handleLog = (msg) => setLogs((prev) => [...prev, msg]);
     const handleStatus = (data) => setStatus(data);
-    
     const handleLoginSuccess = ({ player, mapList }) => {
       setIsLoggedIn(true);
       setStatus(player);
       setMapList(mapList);
-      
       localStorage.setItem('savedId', player.name);
       if (inputPwRef.current) localStorage.setItem('savedPw', inputPwRef.current);
     };
-
     const handleMapChanged = (newMapId) => {
       setCurrentMapId(newMapId);
-      setTargetMonsterIdx(0); // 맵 바뀌면 첫 번째 몬스터로 타겟 초기화
-      setIsAutoHunting(false); // 맵 이동 시 자동사냥 중지 (안전)
+      setTargetMonsterIdx(0);
+      setIsAutoHunting(false);
     };
 
     socket.on('log_message', handleLog);
@@ -89,7 +82,6 @@ function App() {
     };
   }, []);
 
-  // 자동 로그인
   useEffect(() => {
     if (autoLoginAttempted.current) return;
     const savedId = localStorage.getItem('savedId');
@@ -104,32 +96,35 @@ function App() {
 
   const handleLogin = () => socket.emit('req_login', { id: inputId, pw: inputPw });
   const handleRegister = () => socket.emit('req_register', { id: inputId, pw: inputPw });
-  
   const toggleAutoHunt = () => {
     if (status?.hp <= 0) return alert("체력 부족!");
     setIsAutoHunting(!isAutoHunting);
   };
-
   const handleRest = () => socket.emit('req_rest');
   const handleLogout = () => {
     localStorage.removeItem('savedId');
     localStorage.removeItem('savedPw');
     window.location.reload();
   };
-
   const handleMoveMap = (mapId) => socket.emit('req_move_map', mapId);
-
-  // 💪 스텟 업
   const handleStatUp = () => socket.emit('req_stat_up', 'str');
-
-  // ⚔️ 몬스터 직접 클릭 사냥
   const handleMonsterClick = (idx) => {
-    setTargetMonsterIdx(idx); // 타겟 설정
-    socket.emit('req_hunt', idx); // 즉시 1대 공격
+    setTargetMonsterIdx(idx);
+    socket.emit('req_hunt', idx);
+  };
+  const currentMap = mapList.find(m => m.id === currentMapId);
+
+  // ★ 퍼센트 계산 도우미 함수 ★
+  const getHpPercent = () => {
+    if (!status) return 0;
+    return Math.floor((status.hp / status.max_hp) * 100);
   };
 
-  // 현재 맵의 몬스터 목록 찾기
-  const currentMap = mapList.find(m => m.id === currentMapId);
+  const getExpPercent = () => {
+    if (!status) return 0;
+    const maxExp = status.level * 50; // 서버 규칙과 동일하게
+    return Math.floor((status.exp / maxExp) * 100);
+  };
 
   return (
     <div className="app-container">
@@ -162,10 +157,9 @@ function App() {
         </div>
       ) : (
         <div className="game-layout">
-          {/* 좌측 패널 */}
           <div className="dashboard">
             
-            {/* 1. 내 정보 (스텟창) */}
+            {/* 상태창 */}
             <div className="status-card">
               <div className="stat-row">
                 <span style={{color:'#61afef', fontWeight:'bold'}}>{status?.name}</span>
@@ -173,9 +167,23 @@ function App() {
               </div>
               <div style={{color:'#e5c07b', fontWeight:'bold', marginBottom:'10px'}}>Lv.{status?.level}</div>
               
-              <div className="bar-bg"><div className="hp-bar" style={{width: `${(status?.hp/status?.max_hp)*100}%`}}></div></div>
-              <div style={{fontSize:'12px', textAlign:'right', marginBottom:'5px'}}>{status?.hp} / {status?.max_hp}</div>
-              <div className="bar-bg"><div className="exp-bar" style={{width: `${(status?.exp/(status?.level*50))*100}%`}}></div></div>
+              {/* ❤️ HP 게이지 */}
+              <div style={{fontSize:'12px', color:'#ccc', marginBottom:'2px'}}>HP</div>
+              <div className="bar-container">
+                <div className="hp-bar" style={{width: `${getHpPercent()}%`}}></div>
+                <div className="bar-text">
+                  {status?.hp} / {status?.max_hp} ({getHpPercent()}%)
+                </div>
+              </div>
+
+              {/* ⭐ EXP 게이지 */}
+              <div style={{fontSize:'12px', color:'#ccc', marginBottom:'2px'}}>EXP</div>
+              <div className="bar-container">
+                <div className="exp-bar" style={{width: `${getExpPercent()}%`}}></div>
+                <div className="bar-text">
+                  {getExpPercent()}% ({status?.exp} / {status?.level * 50})
+                </div>
+              </div>
 
               {/* 스텟 강화 UI */}
               <div style={{marginTop:'15px', borderTop:'1px solid #3e4451', paddingTop:'15px'}}>
@@ -184,20 +192,18 @@ function App() {
                    {status?.stat_points > 0 && (
                      <button 
                        onClick={handleStatUp}
-                       style={{padding:'2px 8px', background:'#e5c07b', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}
-                     >+ UP</button>
+                       style={{padding:'4px 10px', background:'#e5c07b', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold', color:'#282c34'}}
+                     >+ 강화</button>
                    )}
                 </div>
                 {status?.stat_points > 0 && (
-                  <div style={{color:'#e5c07b', fontSize:'12px', marginTop:'5px'}}>✨ 남은 포인트: {status?.stat_points}</div>
+                  <div style={{color:'#e5c07b', fontSize:'12px', marginTop:'5px', textAlign:'right'}}>✨ 남은 포인트: {status?.stat_points}</div>
                 )}
               </div>
             </div>
 
-            {/* 2. 사냥터 & 몬스터 목록 */}
+            {/* 사냥터 & 몬스터 목록 */}
             <div className="status-card" style={{marginTop:'10px', flex:1, display:'flex', flexDirection:'column'}}>
-              
-              {/* 맵 탭 (가로 스크롤) */}
               <div style={{display:'flex', gap:'5px', overflowX:'auto', paddingBottom:'10px', marginBottom:'10px', borderBottom:'1px solid #3e4451'}}>
                 {mapList.map((map) => (
                   <button 
@@ -220,8 +226,7 @@ function App() {
                 ))}
               </div>
 
-              {/* 몬스터 리스트 */}
-              <div style={{color:'#fff', marginBottom:'5px', fontSize:'14px'}}>👹 몬스터 선택 (클릭하여 공격)</div>
+              <div style={{color:'#fff', marginBottom:'5px', fontSize:'14px'}}>👹 몬스터 선택</div>
               <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', overflowY:'auto', maxHeight:'200px'}}>
                 {currentMap?.monsters.map((mon, idx) => (
                   <button
@@ -243,7 +248,6 @@ function App() {
                   </button>
                 ))}
               </div>
-
             </div>
 
             {/* 컨트롤 */}
@@ -266,7 +270,6 @@ function App() {
             </div>
           </div>
 
-          {/* 로그창 */}
           <div className="log-window">
             {logs.map((log, idx) => (
               <div key={idx} style={{marginBottom:'5px'}}>
