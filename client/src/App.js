@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
-import './App.css'; // 기본 스타일
+import './App.css'; 
 
-// 로컬 테스트용 주소 (배포 후엔 실제 서버 주소로 변경)
-const socket = io.connect("http://localhost:3001");
+// ✅ 여기가 핵심! 방금 따온 리얼 서버 주소입니다.
+const socket = io.connect("https://mud-game-project-production.up.railway.app");
 
 function App() {
   const [logs, setLogs] = useState([]);
@@ -12,12 +12,10 @@ function App() {
   const [isJoined, setIsJoined] = useState(false);
 
   useEffect(() => {
-    // 서버에서 로그가 오면 화면에 추가
     socket.on('log_message', (msg) => {
       setLogs((prev) => [...prev, msg]);
     });
 
-    // 내 스탯 정보 갱신
     socket.on('update_status', (data) => {
       setStatus(data);
     });
@@ -32,7 +30,7 @@ function App() {
 
   return (
     <div style={{ padding: "20px", fontFamily: "Courier New" }}>
-      <h1>🌲 텍스트의 숲 (Dev Ver)</h1>
+      <h1>🌲 텍스트의 숲 (Live Ver)</h1>
       
       {!isJoined ? (
         <div>
