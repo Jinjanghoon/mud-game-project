@@ -35,7 +35,7 @@ function App() {
           socket.emit('req_hunt', targetMonsterIdx);
         }, 1000); 
       } else {
-        // 💀 체력 부족 시: 경고창(alert) 대신 자동사냥 끄고 로그 출력
+        // 💀 체력 부족 시: 자동사냥 끄고 로그 출력
         setIsAutoHunting(false);
         setLogs(prev => [...prev, "[시스템] ⛔ 체력이 부족하여 자동 사냥이 중단되었습니다."]);
       }
@@ -71,7 +71,7 @@ function App() {
     socket.on('update_status', handleStatus);
     socket.on('login_success', handleLoginSuccess);
     socket.on('map_changed', handleMapChanged);
-    socket.on('login_fail', (msg) => alert(msg)); // 로그인 실패는 alert 유지
+    socket.on('login_fail', (msg) => alert(msg)); 
     socket.on('register_success', (msg) => { alert(msg); setIsLoginMode(true); });
 
     return () => {
@@ -101,21 +101,25 @@ function App() {
   
   const toggleAutoHunt = () => {
     if (status?.hp <= 0) {
-      // alert 대신 로그로 안내
       setLogs(prev => [...prev, "[시스템] 체력이 없어 사냥을 시작할 수 없습니다."]);
       return; 
     }
     setIsAutoHunting(!isAutoHunting);
   };
 
+  // ✅ 부활/휴식 요청 (서버로 휴식 요청을 보냄)
   const handleRest = () => socket.emit('req_rest');
+  
   const handleLogout = () => {
     localStorage.removeItem('savedId');
     localStorage.removeItem('savedPw');
     window.location.reload();
   };
   const handleMoveMap = (mapId) => socket.emit('req_move_map', mapId);
+  
+  // ✅ 스탯 강화 (초보자는 힘 자동분배지만, 버튼 클릭시 일단 str 요청)
   const handleStatUp = () => socket.emit('req_stat_up', 'str');
+  
   const handleMonsterClick = (idx) => {
     setTargetMonsterIdx(idx);
     socket.emit('req_hunt', idx);
@@ -123,7 +127,28 @@ function App() {
   const currentMap = mapList.find(m => m.id === currentMapId);
 
   const getHpPercent = () => status ? Math.floor((status.hp / status.max_hp) * 100) : 0;
+  // 레벨 5부터 전직 가능하므로 경험치통 조정 (임의로 레벨*50)
   const getExpPercent = () => status ? Math.floor((status.exp / (status.level * 50)) * 100) : 0;
+
+  // 🔥 [수정됨] 공격력 계산 함수 (기본 10 + 직업별 주스탯)
+  // 화면에 표시하기 위한 용도입니다. 실제 데미지는 서버 계산을 따릅니다.
+  const getDisplayAttack = () => {
+    if (!status) return 0;
+    const baseAttack = 10;
+    
+    // 서버에서 str, dex, int를 다 보내준다고 가정
+    // 만약 서버에서 안 보내주면 0으로 처리
+    const str = status.str || 0;
+    const dex = status.dex || 0; 
+    const int = status.int || 0; 
+
+    if (status.job === '전사') return baseAttack + str;
+    if (status.job === '궁수') return baseAttack + dex;
+    if (status.job === '마법사') return baseAttack + int;
+    
+    // 초보자는 힘 기반
+    return baseAttack + str; 
+  };
 
   return (
     <div className="app-container">
@@ -141,7 +166,7 @@ function App() {
             style={{fontSize: '1.2rem', padding: '15px 30px', boxShadow: '0 0 20px #98c379'}}
             onClick={handleRest}
           >
-            💤 즉시 휴식하고 부활하기
+            💤 즉시 휴식하고 부활하기 (체력 100%)
           </button>
         </div>
       )}
@@ -193,14 +218,29 @@ function App() {
 
               <div style={{marginTop:'15px', borderTop:'1px solid #3e4451', paddingTop:'15px'}}>
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                   <span>⚔️ 공격력: <span style={{color:'#e06c75', fontWeight:'bold'}}>{status?.str}</span></span>
-                   {status?.stat_points > 0 && (
-                     <button onClick={handleStatUp} style={{padding:'4px 10px', background:'#e5c07b', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold', color:'#282c34'}}>+ 강화</button>
+                   {/* 🔥 [수정됨] 계산된 공격력 표시 */}
+                   <span>
+                     ⚔️ 공격력: <span style={{color:'#e06c75', fontWeight:'bold'}}>{getDisplayAttack()}</span>
+                     <span style={{fontSize:'10px', color:'#777', marginLeft:'5px'}}>
+                       (기본10+{status?.job==='궁수'?'민첩':status?.job==='마법사'?'지력':'힘'})
+                     </span>
+                   </span>
+
+                   {/* 초보자가 아닐 때만 스탯 강화 버튼 표시하거나, 초보자도 표시하되 자동분배는 서버에서 처리 */}
+                   {status?.stat_points > 0 && status?.job !== '초보자' && (
+                      <button onClick={handleStatUp} style={{padding:'4px 10px', background:'#e5c07b', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold', color:'#282c34'}}>+ 강화</button>
+                   )}
+                   {status?.job === '초보자' && status?.stat_points > 0 && (
+                     <span style={{fontSize:'10px', color:'#e5c07b'}}>초보자는 힘 자동분배</span>
                    )}
                 </div>
                 {status?.stat_points > 0 && (
                   <div style={{color:'#e5c07b', fontSize:'12px', marginTop:'5px', textAlign:'right'}}>✨ 남은 포인트: {status?.stat_points}</div>
                 )}
+                {/* 현재 스탯 현황 표시 (디버깅용) */}
+                <div style={{fontSize:'10px', color:'#aaa', marginTop:'5px'}}>
+                  STR: {status?.str} | DEX: {status?.dex || 0} | INT: {status?.int || 0}
+                </div>
               </div>
             </div>
 
