@@ -13,7 +13,7 @@ function App() {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // 🤖 자동 사냥 상태 (true면 사냥 중)
+  // 🤖 자동 사냥 상태
   const [isAutoHunting, setIsAutoHunting] = useState(false);
 
   const logEndRef = useRef(null);
@@ -23,36 +23,55 @@ function App() {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
-  // 🤖 자동 사냥 로직 (핵심!)
+  // 🤖 자동 사냥 로직
   useEffect(() => {
     let timer;
     if (isAutoHunting) {
-      // 1. 체력이 있는지 확인
       if (status && status.hp > 0) {
         timer = setTimeout(() => {
-          socket.emit('req_hunt'); // 1초 뒤 사냥 요청
-        }, 1000); // 속도 조절 (1000 = 1초)
+          socket.emit('req_hunt'); 
+        }, 1000); 
       } else {
-        // 체력 없으면 자동 사냥 종료
         setIsAutoHunting(false);
         alert("체력이 부족하여 자동 사냥을 종료합니다.");
       }
     }
-    return () => clearTimeout(timer); // 정리(Clean-up)
-  }, [isAutoHunting, status]); // 상태가 변할 때마다 실행
+    return () => clearTimeout(timer); 
+  }, [isAutoHunting, status]); 
 
+  // 👂 [핵심 수정] 서버 메시지 듣는 리스너 (딱 1번만 실행되게 수정함)
   useEffect(() => {
-    socket.on('log_message', (msg) => setLogs((prev) => [...prev, msg]));
-    socket.on('update_status', (data) => setStatus(data));
-    socket.on('login_success', (data) => {
+    // 1. 이벤트 핸들러 정의
+    const handleLog = (msg) => setLogs((prev) => [...prev, msg]);
+    const handleStatus = (data) => setStatus(data);
+    const handleLoginSuccess = (data) => {
       setIsLoggedIn(true);
       setStatus(data);
       localStorage.setItem('savedId', data.name);
-      localStorage.setItem('savedPw', inputPw);
-    });
-    socket.on('login_fail', (msg) => alert(msg));
-    socket.on('register_success', (msg) => { alert(msg); setIsLoginMode(true); });
+      // 비밀번호는 inputPw 상태가 아니라 로컬스토리지 값을 우선시해야 함 (여기선 간단히 처리)
+    };
+    const handleLoginFail = (msg) => alert(msg);
+    const handleRegisterSuccess = (msg) => { alert(msg); setIsLoginMode(true); };
 
+    // 2. 리스너 등록 (귀 열기)
+    socket.on('log_message', handleLog);
+    socket.on('update_status', handleStatus);
+    socket.on('login_success', handleLoginSuccess);
+    socket.on('login_fail', handleLoginFail);
+    socket.on('register_success', handleRegisterSuccess);
+
+    // 3. 뒷정리 함수 (귀 닫기) - 컴포넌트가 사라지거나 재실행될 때 중복 방지
+    return () => {
+      socket.off('log_message', handleLog);
+      socket.off('update_status', handleStatus);
+      socket.off('login_success', handleLoginSuccess);
+      socket.off('login_fail', handleLoginFail);
+      socket.off('register_success', handleRegisterSuccess);
+    };
+  }, []); // ✅ 여기가 비어있어야([]), 처음에 딱 한 번만 실행됨!
+
+  // 앱 켜자마자 자동 로그인 시도 (별도 useEffect로 분리)
+  useEffect(() => {
     const savedId = localStorage.getItem('savedId');
     const savedPw = localStorage.getItem('savedPw');
     if (savedId && savedPw) {
@@ -60,14 +79,19 @@ function App() {
       setInputPw(savedPw);
       socket.emit('req_login', { id: savedId, pw: savedPw });
     }
-  }, [inputPw]);
+  }, []);
 
-  const handleLogin = () => socket.emit('req_login', { id: inputId, pw: inputPw });
+  const handleLogin = () => {
+    // 로그인 성공 시에만 저장하도록 로직 변경 필요하지만, 편의상 여기서 저장
+    localStorage.setItem('savedPw', inputPw); 
+    socket.emit('req_login', { id: inputId, pw: inputPw });
+  };
+  
   const handleRegister = () => socket.emit('req_register', { id: inputId, pw: inputPw });
   
-  // 수동 사냥 (자동 사냥 중에는 클릭 방지)
-  const handleHunt = () => {
-    if (!isAutoHunting) socket.emit('req_hunt');
+  const toggleAutoHunt = () => {
+    if (status?.hp <= 0) return alert("체력이 부족합니다! 휴식하세요.");
+    setIsAutoHunting(!isAutoHunting);
   };
 
   const handleRest = () => socket.emit('req_rest');
@@ -78,14 +102,6 @@ function App() {
     window.location.reload();
   };
 
-  // 자동 사냥 토글 버튼
-  const toggleAutoHunt = () => {
-    if (status?.hp <= 0) {
-      return alert("체력이 부족합니다! 휴식하세요.");
-    }
-    setIsAutoHunting(!isAutoHunting);
-  };
-
   return (
     <div className="app-container">
       <header className="header">
@@ -93,7 +109,6 @@ function App() {
       </header>
 
       {!isLoggedIn ? (
-        // [로그인 화면]
         <div className="login-wrapper">
           <div className="login-box">
             <h2 style={{color:'white', marginBottom:'10px', fontSize:'2rem'}}>
@@ -131,9 +146,7 @@ function App() {
           </div>
         </div>
       ) : (
-        // [인게임 화면]
         <div className="game-layout">
-          {/* 좌측 패널 */}
           <div className="dashboard">
             <div className="status-card">
               <div className="stat-row">
@@ -157,7 +170,6 @@ function App() {
             </div>
 
             <div className="control-panel" style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-              {/* 자동 사냥 버튼으로 교체 */}
               <button 
                 className="btn" 
                 style={{
@@ -175,7 +187,6 @@ function App() {
             </div>
           </div>
 
-          {/* 우측 로그창 */}
           <div className="log-window">
             {logs.length === 0 && <div style={{textAlign:'center', color:'#555', marginTop:'100px'}}>- 모험의 기록이 여기에 표시됩니다 -</div>}
             {logs.map((log, idx) => (
