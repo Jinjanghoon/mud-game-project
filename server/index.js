@@ -38,6 +38,7 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(3001, () => {
+// process.env.PORT는 서버가 주는 포트를 쓴다는 뜻입니다.
+server.listen(process.env.PORT || 3001, () => {
   console.log('SERVER RUNNING ON PORT 3001');
 });
