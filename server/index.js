@@ -10,10 +10,7 @@ app.use(cors());
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+  cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
 const pool = new Pool({
@@ -35,12 +32,48 @@ pool.query(`
 `).then(() => console.log("DB 테이블 체크 완료"))
   .catch(err => console.error("DB 테이블 에러:", err));
 
-// 👾 몬스터 도감 (나중에 더 추가 가능)
-const monsters = [
-  { name: "슬라임", hp: 30, atk: 5, exp: 5 },
-  { name: "주황버섯", hp: 50, atk: 10, exp: 15 },
-  { name: "돼지", hp: 80, atk: 15, exp: 30 },
-  { name: "스톤골렘", hp: 200, atk: 40, exp: 100 }
+// 🗺️ 사냥터 및 몬스터 데이터 (여기를 수정해서 밸런스 조절!)
+const huntingGrounds = [
+  {
+    id: 0,
+    name: "🌱 초심자의 숲",
+    minLevel: 1,
+    monsters: [
+      { name: "슬라임", hp: 30, atk: 5, exp: 5 },
+      { name: "달팽이", hp: 40, atk: 8, exp: 7 },
+      { name: "주황버섯", hp: 50, atk: 10, exp: 10 }
+    ]
+  },
+  {
+    id: 1,
+    name: "🏜️ 거친 황무지",
+    minLevel: 10,
+    monsters: [
+      { name: "사막여우", hp: 150, atk: 25, exp: 30 },
+      { name: "전갈", hp: 200, atk: 35, exp: 45 },
+      { name: "선인장", hp: 250, atk: 40, exp: 50 }
+    ]
+  },
+  {
+    id: 2,
+    name: "💀 해골의 지하감옥",
+    minLevel: 30,
+    monsters: [
+      { name: "스켈레톤", hp: 800, atk: 80, exp: 150 },
+      { name: "좀비", hp: 1000, atk: 90, exp: 200 },
+      { name: "유령", hp: 900, atk: 110, exp: 220 }
+    ]
+  },
+  {
+    id: 3,
+    name: "🔥 악마의 성",
+    minLevel: 50,
+    monsters: [
+      { name: "가고일", hp: 3000, atk: 200, exp: 800 },
+      { name: "발록", hp: 5000, atk: 300, exp: 1500 },
+      { name: "레드 드래곤", hp: 10000, atk: 500, exp: 3000 }
+    ]
+  }
 ];
 
 let connectedPlayers = {};
@@ -53,13 +86,9 @@ io.on('connection', (socket) => {
     try {
       const check = await pool.query('SELECT * FROM players WHERE name = $1', [id]);
       if (check.rows.length > 0) return socket.emit('login_fail', '이미 존재하는 닉네임입니다.');
-      
       await pool.query('INSERT INTO players (name, password) VALUES ($1, $2)', [id, pw]);
       socket.emit('register_success', `가입 완료! 로그인해주세요.`);
-    } catch (err) {
-      console.error(err);
-      socket.emit('login_fail', '회원가입 오류');
-    }
+    } catch (err) { socket.emit('login_fail', '회원가입 오류'); }
   });
 
   // 2. 로그인
@@ -68,81 +97,94 @@ io.on('connection', (socket) => {
       const res = await pool.query('SELECT * FROM players WHERE name = $1 AND password = $2', [id, pw]);
       if (res.rows.length > 0) {
         const player = res.rows[0];
+        
+        // 로그인 시 기본 위치는 '초심자의 숲(0)'으로 설정 (메모리에만 저장)
+        player.mapId = 0; 
+        
         connectedPlayers[socket.id] = player;
-        socket.emit('login_success', player);
+        socket.emit('login_success', { player, mapList: huntingGrounds }); // 맵 목록도 같이 보냄
         socket.emit('log_message', `[시스템] 환영합니다, ${player.name}님! (LV.${player.level})`);
+        socket.emit('log_message', `[이동] 현재 위치: ${huntingGrounds[0].name}`);
       } else {
         socket.emit('login_fail', '아이디/비밀번호 오류');
       }
-    } catch (err) {
-      socket.emit('login_fail', '로그인 오류');
-    }
+    } catch (err) { socket.emit('login_fail', '로그인 오류'); }
   });
 
-  // ⚔️ 3. 사냥하기 (핵심 기능!)
+  // 🏃 3. 사냥터 이동 (New!)
+  socket.on('req_move_map', (targetMapId) => {
+    const player = connectedPlayers[socket.id];
+    if (!player) return;
+
+    const targetMap = huntingGrounds.find(map => map.id === targetMapId);
+    
+    // 레벨 제한 체크
+    if (player.level < targetMap.minLevel) {
+      return socket.emit('log_message', `[경고] ⛔ 레벨 ${targetMap.minLevel} 이상만 입장할 수 있습니다!`);
+    }
+
+    // 이동 처리
+    player.mapId = targetMapId;
+    connectedPlayers[socket.id] = player;
+    
+    socket.emit('map_changed', targetMapId); // 클라이언트 UI 업데이트용
+    socket.emit('log_message', `[이동] 🦶 '${targetMap.name}'으로 이동했습니다.`);
+  });
+
+  // ⚔️ 4. 사냥하기 (위치 기반)
   socket.on('req_hunt', () => {
     const player = connectedPlayers[socket.id];
     if (!player) return;
 
-    if (player.hp <= 0) {
-      return socket.emit('log_message', `[전투] 체력이 없어 사냥할 수 없습니다!`);
-    }
+    if (player.hp <= 0) return socket.emit('log_message', `[전투] 💀 체력이 없어 사냥 불가!`);
 
-    // 랜덤 몬스터 출현
-    const monsterIndex = Math.floor(Math.random() * monsters.length);
-    const monster = monsters[monsterIndex];
-
-    // 전투 계산 (간단 버전: 한 대 때리고 한 대 맞기)
-    // 1. 플레이어 공격
-    const damage = player.str || 10; // 공격력 (기본 10)
+    // 현재 위치한 맵의 몬스터 목록 가져오기
+    const currentMap = huntingGrounds.find(map => map.id === player.mapId) || huntingGrounds[0];
+    const monsters = currentMap.monsters;
     
-    // 2. 결과 판정
-    let log = `[전투] ⚔️ ${monster.name}을(를) 공격해 ${damage}의 피해를 입혔습니다!`;
+    // 랜덤 몬스터 출현
+    const monster = monsters[Math.floor(Math.random() * monsters.length)];
+
+    // 전투 계산
+    const damage = player.str || 10;
+    let log = `[전투] ⚔️ ${monster.name}(을)를 공격해 ${damage} 피해!`;
     
     if (damage >= monster.hp) {
-      // 몬스터 처치!
       player.exp += monster.exp;
       log += ` (처치! +${monster.exp} EXP)`;
       
-      // 레벨업 체크 (필요 경험치: 레벨 * 50)
       const maxExp = player.level * 50;
       if (player.exp >= maxExp) {
         player.level += 1;
         player.exp -= maxExp;
-        player.max_hp += 20; // 체력통 증가
-        player.hp = player.max_hp; // 레벨업 시 체력 회복
-        player.str = (player.str || 10) + 5; // 공격력 증가
-        log += ` ✨ 레벨업! (LV.${player.level})`;
+        player.max_hp += 20;
+        player.hp = player.max_hp;
+        player.str = (player.str || 10) + 5;
+        log += ` ✨ Level Up! (LV.${player.level})`;
       }
     } else {
-      // 몬스터 반격
       player.hp -= monster.atk;
-      log += ` 💢 ${monster.name}에게 ${monster.atk}의 피해를 입었습니다.`;
+      log += ` 💢 반격당해 ${monster.atk} 피해.`;
       if (player.hp < 0) player.hp = 0;
     }
 
-    // 상태 업데이트 전송
     connectedPlayers[socket.id] = player;
     socket.emit('update_status', player);
     socket.emit('log_message', log);
   });
 
-  // 💖 4. 휴식하기 (체력 회복)
+  // 5. 휴식
   socket.on('req_rest', () => {
     const player = connectedPlayers[socket.id];
-    if (!player) return;
-
-    if (player.hp < player.max_hp) {
-      player.hp = Math.min(player.hp + 10, player.max_hp);
+    if (player && player.hp < player.max_hp) {
+      player.hp = Math.min(player.hp + 20, player.max_hp); // 휴식 효율 증가
       connectedPlayers[socket.id] = player;
       socket.emit('update_status', player);
-      socket.emit('log_message', `[휴식] 💤 체력을 회복합니다. (HP: ${player.hp}/${player.max_hp})`);
-    } else {
-      socket.emit('log_message', `[시스템] 이미 체력이 가득 찼습니다.`);
+      socket.emit('log_message', `[휴식] 💤 체력 회복 중... (${player.hp}/${player.max_hp})`);
     }
   });
 
-  // 5. 연결 종료 (저장)
+  // 6. 종료 및 저장
   socket.on('disconnect', async () => {
     const player = connectedPlayers[socket.id];
     if (player) {
@@ -158,6 +200,4 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(process.env.PORT || 3001, () => {
-  console.log('SERVER RUNNING');
-});
+server.listen(process.env.PORT || 3001, () => console.log('SERVER RUNNING'));
