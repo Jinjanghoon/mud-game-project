@@ -18,7 +18,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// ✅ DB 테이블 업데이트 (직업, 스텟포인트 추가)
+// ✅ DB 테이블 (직업, 스텟포인트 포함)
 pool.query(`
   CREATE TABLE IF NOT EXISTS players (
     name VARCHAR(50) PRIMARY KEY,
@@ -33,13 +33,11 @@ pool.query(`
   )
 `).then(() => {
   console.log("DB 테이블 체크 완료");
-  // 기존 유저들을 위한 컬럼 추가 (에러 방지용)
   pool.query("ALTER TABLE players ADD COLUMN IF NOT EXISTS job VARCHAR(50) DEFAULT '초보자'");
   pool.query("ALTER TABLE players ADD COLUMN IF NOT EXISTS stat_points INT DEFAULT 0");
-})
-.catch(err => console.error("DB 테이블 에러:", err));
+}).catch(err => console.error("DB 테이블 에러:", err));
 
-// 🗺️ 사냥터 및 몬스터 데이터 (밸런스 조정)
+// 🗺️ 사냥터 데이터
 const huntingGrounds = [
   {
     id: 0,
@@ -83,7 +81,6 @@ io.on('connection', (socket) => {
     try {
       const check = await pool.query('SELECT * FROM players WHERE name = $1', [id]);
       if (check.rows.length > 0) return socket.emit('login_fail', '이미 존재하는 닉네임입니다.');
-      // 기본 직업: 모험가
       await pool.query('INSERT INTO players (name, password, job) VALUES ($1, $2, $3)', [id, pw, '모험가']);
       socket.emit('register_success', `가입 완료! 로그인해주세요.`);
     } catch (err) { console.error(err); socket.emit('login_fail', '회원가입 오류'); }
@@ -95,9 +92,10 @@ io.on('connection', (socket) => {
       const res = await pool.query('SELECT * FROM players WHERE name = $1 AND password = $2', [id, pw]);
       if (res.rows.length > 0) {
         const player = res.rows[0];
-        player.mapId = 0; // 접속 시 시작 마을
-        connectedPlayers[socket.id] = player;
+        player.mapId = 0; // 시작 위치
+        player.combat = null; // ★ 전투 상태 초기화
         
+        connectedPlayers[socket.id] = player;
         socket.emit('login_success', { player, mapList: huntingGrounds });
         socket.emit('log_message', `[시스템] 환영합니다, ${player.job} ${player.name}님!`);
       } else {
@@ -106,7 +104,7 @@ io.on('connection', (socket) => {
     } catch (err) { socket.emit('login_fail', '로그인 오류'); }
   });
 
-  // 🗺️ 맵 이동
+  // 3. 맵 이동
   socket.on('req_move_map', (targetMapId) => {
     const player = connectedPlayers[socket.id];
     if (!player) return;
@@ -117,45 +115,66 @@ io.on('connection', (socket) => {
     }
 
     player.mapId = targetMapId;
+    player.combat = null; // 맵 이동 시 전투 중단
     connectedPlayers[socket.id] = player;
+    
     socket.emit('map_changed', targetMapId);
     socket.emit('log_message', `[이동] 🦶 '${targetMap.name}'에 도착했습니다.`);
   });
 
-  // ⚔️ 몬스터 지정 사냥 (타겟팅)
+  // ⚔️ 4. 사냥하기 (수정된 핵심 로직!)
   socket.on('req_hunt', (monsterIndex) => {
     const player = connectedPlayers[socket.id];
     if (!player) return;
-    if (player.hp <= 0) return socket.emit('log_message', `[전투] 💀 체력이 없어 사냥할 수 없습니다.`);
+    if (player.hp <= 0) return socket.emit('log_message', `[전투] 💀 기절 상태입니다. 휴식하세요.`);
 
     const currentMap = huntingGrounds.find(map => map.id === player.mapId) || huntingGrounds[0];
-    
-    // 클라이언트가 보낸 인덱스로 몬스터 찾기 (없으면 0번)
-    const targetMonster = currentMap.monsters[monsterIndex] || currentMap.monsters[0];
+    const targetInfo = currentMap.monsters[monsterIndex] || currentMap.monsters[0];
 
-    // 전투 계산
+    // ★ 전투 인스턴스 확인 (지금 싸우던 놈인가? 아니면 새 놈인가?)
+    if (!player.combat || player.combat.monsterId !== targetInfo.id || player.combat.mapId !== currentMap.id) {
+      // 새로운 몬스터 등장!
+      player.combat = {
+        mapId: currentMap.id,
+        monsterId: targetInfo.id,
+        name: targetInfo.name,
+        hp: targetInfo.hp, // 현재 체력
+        max_hp: targetInfo.hp,
+        atk: targetInfo.atk,
+        exp: targetInfo.exp
+      };
+      socket.emit('log_message', `[전투] ⚠️ 야생의 ${player.combat.name}(이)가 나타났다! (HP: ${player.combat.hp})`);
+    }
+
+    // 플레이어 공격
     const damage = player.str || 10;
-    let log = `[전투] 🗡️ ${targetMonster.name}에게 ${damage}의 데미지!`;
+    player.combat.hp -= damage; // 몬스터 체력 깎기
 
-    if (damage >= targetMonster.hp) {
-      // 몬스터 처치
-      player.exp += targetMonster.exp;
-      log += ` (처치! +${targetMonster.exp} EXP)`;
+    let log = `[전투] 🗡️ ${player.combat.name}에게 ${damage} 피해!`;
 
-      // 레벨업 로직
+    // 몬스터 사망 체크
+    if (player.combat.hp <= 0) {
+      log += ` (처치! +${player.combat.exp} EXP)`;
+      
+      // 경험치 및 레벨업 처리
+      player.exp += player.combat.exp;
+      player.combat = null; // 전투 종료 (적 사라짐)
+
       const maxExp = player.level * 50;
       if (player.exp >= maxExp) {
         player.level += 1;
         player.exp -= maxExp;
         player.max_hp += 20;
         player.hp = player.max_hp;
-        player.stat_points += 5; // ★ 스텟 포인트 지급!
-        log += ` ✨ Level Up! (LV.${player.level}) 스텟 포인트 +5 획득!`;
+        player.stat_points += 5;
+        log += ` ✨ Level Up! (LV.${player.level})`;
       }
     } else {
-      // 반격
-      player.hp -= targetMonster.atk;
-      log += ` 💢 ${targetMonster.atk}의 피해를 입었습니다.`;
+      // 몬스터 반격 (아직 살아있음)
+      log += ` (적 HP: ${player.combat.hp}/${player.combat.max_hp})`;
+      player.hp -= player.combat.atk;
+      log += ` 💢 ${player.combat.atk} 반격 피해.`;
+      
       if (player.hp < 0) player.hp = 0;
     }
 
@@ -164,37 +183,30 @@ io.on('connection', (socket) => {
     socket.emit('log_message', log);
   });
 
-  // 💪 스텟 올리기
+  // 5. 스텟 업
   socket.on('req_stat_up', (statType) => {
     const player = connectedPlayers[socket.id];
-    if (!player) return;
-
-    if (player.stat_points > 0) {
-      if (statType === 'str') {
-        player.str += 1; // 공격력 1 증가
-        player.stat_points -= 1;
-        socket.emit('log_message', `[성장] 💪 공격력이 증가했습니다! (현재: ${player.str})`);
-      }
-      // 추후 hp, dex 등 추가 가능
+    if (player && player.stat_points > 0 && statType === 'str') {
+      player.str += 1;
+      player.stat_points -= 1;
+      socket.emit('log_message', `[성장] 💪 공격력 증가! (현재: ${player.str})`);
       connectedPlayers[socket.id] = player;
       socket.emit('update_status', player);
-    } else {
-      socket.emit('log_message', `[시스템] 스텟 포인트가 부족합니다.`);
     }
   });
 
-  // 휴식
+  // 6. 휴식
   socket.on('req_rest', () => {
     const player = connectedPlayers[socket.id];
     if (player && player.hp < player.max_hp) {
       player.hp = Math.min(player.hp + 20, player.max_hp);
       connectedPlayers[socket.id] = player;
       socket.emit('update_status', player);
-      socket.emit('log_message', `[휴식] 💤 체력을 회복합니다. (${player.hp}/${player.max_hp})`);
+      socket.emit('log_message', `[휴식] 💤 체력 회복 중... (${player.hp}/${player.max_hp})`);
     }
   });
 
-  // 저장
+  // 7. 종료 및 저장
   socket.on('disconnect', async () => {
     const player = connectedPlayers[socket.id];
     if (player) {
