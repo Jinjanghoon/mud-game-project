@@ -8,8 +8,8 @@ const socket = io.connect("https://mud-game-project-production.up.railway.app");
 function App() {
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState(null);
-  const [mapList, setMapList] = useState([]); // 서버에서 받은 사냥터 목록
-  const [currentMapId, setCurrentMapId] = useState(0); // 현재 내 위치
+  const [mapList, setMapList] = useState([]); 
+  const [currentMapId, setCurrentMapId] = useState(0); 
 
   const [inputId, setInputId] = useState("");
   const [inputPw, setInputPw] = useState("");
@@ -17,9 +17,17 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAutoHunting, setIsAutoHunting] = useState(false);
 
+  // 🔄 최신 비밀번호 값을 리스너 안에서 쓰기 위한 Ref (중요!)
+  const inputPwRef = useRef("");
   const autoLoginAttempted = useRef(false);
   const logEndRef = useRef(null);
 
+  // 비밀번호 입력할 때마다 Ref에 최신값 동기화
+  useEffect(() => {
+    inputPwRef.current = inputPw;
+  }, [inputPw]);
+
+  // 로그 스크롤
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
@@ -38,43 +46,54 @@ function App() {
     return () => clearTimeout(timer); 
   }, [isAutoHunting, status]); 
 
-  // 서버 이벤트 리스너
+  // 👂 [핵심] 서버 이벤트 리스너 (중복 방지 끝판왕)
   useEffect(() => {
+    // 1. 기존에 붙어있던 리스너를 무조건 다 떼어냅니다. (초기화)
+    socket.off('log_message');
+    socket.off('update_status');
+    socket.off('login_success');
+    socket.off('map_changed');
+    socket.off('login_fail');
+    socket.off('register_success');
+
+    // 2. 핸들러 정의
     const handleLog = (msg) => setLogs((prev) => [...prev, msg]);
     const handleStatus = (data) => setStatus(data);
     
-    // 로그인 성공 시 맵 목록도 같이 받음
     const handleLoginSuccess = ({ player, mapList }) => {
       setIsLoggedIn(true);
       setStatus(player);
-      setMapList(mapList); // 맵 목록 저장
+      setMapList(mapList);
+      
+      // 로그인 성공 시 저장 (Ref 사용으로 중복 실행 방지하면서 최신값 저장)
       localStorage.setItem('savedId', player.name);
-      if (inputPw) localStorage.setItem('savedPw', inputPw);
+      if (inputPwRef.current) {
+        localStorage.setItem('savedPw', inputPwRef.current);
+      }
     };
 
-    // 맵 이동 성공 시
-    const handleMapChanged = (newMapId) => {
-      setCurrentMapId(newMapId);
-    };
+    const handleMapChanged = (newMapId) => setCurrentMapId(newMapId);
 
+    // 3. 리스너 등록 (딱 한 번만)
     socket.on('log_message', handleLog);
     socket.on('update_status', handleStatus);
     socket.on('login_success', handleLoginSuccess);
-    socket.on('map_changed', handleMapChanged); // 리스너 추가
+    socket.on('map_changed', handleMapChanged);
     socket.on('login_fail', (msg) => alert(msg));
     socket.on('register_success', (msg) => { alert(msg); setIsLoginMode(true); });
 
+    // 4. 컴포넌트 사라질 때 청소
     return () => {
-      socket.off('log_message', handleLog);
-      socket.off('update_status', handleStatus);
-      socket.off('login_success', handleLoginSuccess);
-      socket.off('map_changed', handleMapChanged);
+      socket.off('log_message');
+      socket.off('update_status');
+      socket.off('login_success');
+      socket.off('map_changed');
       socket.off('login_fail');
       socket.off('register_success');
     };
-  }, [inputPw]);
+  }, []); // ✅ 의존성 배열을 비워서([]), 처음에 딱 1번만 실행됨을 보장!
 
-  // 자동 로그인
+  // 자동 로그인 시도
   useEffect(() => {
     if (autoLoginAttempted.current) return;
     const savedId = localStorage.getItem('savedId');
@@ -102,7 +121,6 @@ function App() {
     window.location.reload();
   };
 
-  // 🗺️ 맵 이동 요청 함수
   const handleMoveMap = (mapId) => {
     socket.emit('req_move_map', mapId);
   };
@@ -138,10 +156,7 @@ function App() {
         </div>
       ) : (
         <div className="game-layout">
-          {/* 좌측 패널: 상태창 + 이동 + 컨트롤 */}
           <div className="dashboard">
-            
-            {/* 1. 상태창 */}
             <div className="status-card">
               <div className="stat-row">
                 <span style={{color:'#61afef', fontWeight:'bold'}}>{status?.name}</span>
@@ -153,7 +168,6 @@ function App() {
               <div style={{fontSize:'14px', marginTop:'10px'}}>⚔️ 공격력: <span style={{color:'#e06c75'}}>{status?.str}</span></div>
             </div>
 
-            {/* 2. 사냥터 목록 (New!) */}
             <div className="status-card" style={{marginTop:'10px'}}>
               <div style={{color:'#98c379', fontWeight:'bold', marginBottom:'10px'}}>🗺️ 사냥터 이동</div>
               <div style={{display:'flex', flexDirection:'column', gap:'5px'}}>
@@ -183,7 +197,6 @@ function App() {
               </div>
             </div>
 
-            {/* 3. 컨트롤 패널 */}
             <div className="control-panel" style={{marginTop:'10px'}}>
               <button 
                 className="btn" 
@@ -203,7 +216,6 @@ function App() {
             </div>
           </div>
 
-          {/* 우측 패널: 로그창 */}
           <div className="log-window">
             {logs.map((log, idx) => (
               <div key={idx} style={{marginBottom:'5px'}}>
