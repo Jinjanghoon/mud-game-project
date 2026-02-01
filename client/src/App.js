@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import './App.css'; 
 
-// 🚨 본인의 Railway 주소로 변경 확인!
+// ✅ 본인의 Railway 주소 확인!
 const socket = io.connect("https://mud-game-project-production.up.railway.app");
 
 function App() {
@@ -13,41 +13,25 @@ function App() {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // 로그창 스크롤 자동 내리기용
   const logEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // 로그 자동 스크롤
   useEffect(() => {
-    scrollToBottom();
+    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
   useEffect(() => {
-    socket.on('log_message', (msg) => {
-      setLogs((prev) => [...prev, msg]);
-    });
-
-    socket.on('update_status', (data) => {
-      setStatus(data);
-    });
-
+    socket.on('log_message', (msg) => setLogs((prev) => [...prev, msg]));
+    socket.on('update_status', (data) => setStatus(data));
     socket.on('login_success', (data) => {
       setIsLoggedIn(true);
       setStatus(data);
       localStorage.setItem('savedId', data.name);
       localStorage.setItem('savedPw', inputPw);
     });
-
     socket.on('login_fail', (msg) => alert(msg));
-    
-    socket.on('register_success', (msg) => {
-      alert(msg);
-      setIsLoginMode(true);
-    });
+    socket.on('register_success', (msg) => { alert(msg); setIsLoginMode(true); });
 
-    // 자동 로그인 시도
     const savedId = localStorage.getItem('savedId');
     const savedPw = localStorage.getItem('savedPw');
     if (savedId && savedPw) {
@@ -55,28 +39,20 @@ function App() {
       setInputPw(savedPw);
       socket.emit('req_login', { id: savedId, pw: savedPw });
     }
-  }, [inputPw]); // inputPw가 바뀔 때마다가 아니라 초기 로딩시 1번만 실행되게 하려면 []가 맞지만, 자동로그인을 위해 의존성 조정
+  }, [inputPw]);
 
   const handleLogin = () => {
-    if (!inputId || !inputPw) return alert("아이디/비번을 입력하세요.");
+    if (!inputId || !inputPw) return alert("입력 정보가 부족합니다.");
     socket.emit('req_login', { id: inputId, pw: inputPw });
   };
 
   const handleRegister = () => {
-    if (!inputId || !inputPw) return alert("아이디/비번을 입력하세요.");
+    if (!inputId || !inputPw) return alert("입력 정보가 부족합니다.");
     socket.emit('req_register', { id: inputId, pw: inputPw });
   };
 
-  // ⚔️ 사냥 버튼
-  const handleHunt = () => {
-    socket.emit('req_hunt');
-  };
-
-  // 💤 휴식 버튼
-  const handleRest = () => {
-    socket.emit('req_rest');
-  };
-
+  const handleHunt = () => socket.emit('req_hunt');
+  const handleRest = () => socket.emit('req_rest');
   const handleLogout = () => {
     localStorage.removeItem('savedId');
     localStorage.removeItem('savedPw');
@@ -86,87 +62,92 @@ function App() {
   return (
     <div className="app-container">
       <header className="header">
-        <h1 className="title">🌲 텍스트의 숲</h1>
+        <h1 className="title">🌲 텍스트의 숲 Online</h1>
       </header>
 
       {!isLoggedIn ? (
         // [로그인 화면]
-        <div className="login-box">
-          <h2 style={{color: '#fff'}}>{isLoginMode ? "모험 시작하기" : "새로운 영웅 등록"}</h2>
-          <input 
-            placeholder="닉네임 (ID)" 
-            value={inputId}
-            onChange={(e) => setInputId(e.target.value)}
-          />
-          <input 
-            type="password" 
-            placeholder="비밀번호" 
-            value={inputPw}
-            onChange={(e) => setInputPw(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && (isLoginMode ? handleLogin() : handleRegister())}
-          />
+        <div className="login-wrapper">
+          <div className="login-box">
+            <h2 style={{color:'white', margin:'0 0 20px 0'}}>
+              {isLoginMode ? "모험 시작" : "캐릭터 생성"}
+            </h2>
+            <input 
+              placeholder="닉네임 (ID)" 
+              value={inputId}
+              onChange={(e) => setInputId(e.target.value)}
+            />
+            <input 
+              type="password" 
+              placeholder="비밀번호 (PW)" 
+              value={inputPw}
+              onChange={(e) => setInputPw(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && (isLoginMode ? handleLogin() : handleRegister())}
+            />
 
-          {isLoginMode ? (
-            <>
-              <button className="btn-primary" onClick={handleLogin}>접속하기</button>
-              <p onClick={() => setIsLoginMode(false)} className="text-link">
-                계정이 없으신가요? 회원가입
-              </p>
-            </>
-          ) : (
-            <>
-              <button className="btn-success" onClick={handleRegister}>가입하기</button>
-              <p onClick={() => setIsLoginMode(true)} className="text-link">
-                돌아가기
-              </p>
-            </>
-          )}
+            {isLoginMode ? (
+              <>
+                <button className="btn btn-atk" style={{width:'100%', marginTop:'10px'}} onClick={handleLogin}>접속하기</button>
+                <p onClick={() => setIsLoginMode(false)} className="text-link" style={{marginTop:'15px'}}>
+                  처음이신가요? 회원가입
+                </p>
+              </>
+            ) : (
+              <>
+                <button className="btn btn-rest" style={{width:'100%', marginTop:'10px'}} onClick={handleRegister}>가입하기</button>
+                <p onClick={() => setIsLoginMode(true)} className="text-link" style={{marginTop:'15px'}}>
+                  이미 계정이 있나요? 로그인
+                </p>
+              </>
+            )}
+          </div>
         </div>
       ) : (
-        // [인게임 화면]
-        <div className="game-area">
-          {/* 상태창 */}
-          <div className="status-bar">
-            <div style={{display:'flex', justifyContent:'space-between', color:'white', marginBottom:'5px'}}>
-              <strong>Lv.{status?.level} {status?.name}</strong>
-              <span>공격력: {status?.str || 10}</span>
-            </div>
-            
-            {/* HP Bar */}
-            <div className="bar-container">
-              <div 
-                className="hp-fill" 
-                style={{width: `${(status?.hp / status?.max_hp) * 100}%`}}
-              ></div>
-              <div className="bar-text">{status?.hp} / {status?.max_hp} HP</div>
+        // [인게임 화면 - 반응형 레이아웃]
+        <div className="game-layout">
+          {/* 좌측 패널: 대시보드 */}
+          <div className="dashboard">
+            <div className="status-card">
+              <div className="stat-row">
+                <span style={{color:'#61afef'}}>{status?.name}</span>
+                <span style={{color:'#e5c07b'}}>Lv.{status?.level}</span>
+              </div>
+              
+              <div style={{fontSize:'12px', color:'#aaa', marginBottom:'2px'}}>HP</div>
+              <div className="bar-bg">
+                <div className="hp-bar" style={{width: `${(status?.hp / status?.max_hp) * 100}%`}}></div>
+              </div>
+              <div style={{textAlign:'right', fontSize:'12px', marginBottom:'10px'}}>{status?.hp} / {status?.max_hp}</div>
+
+              <div style={{fontSize:'12px', color:'#aaa', marginBottom:'2px'}}>EXP</div>
+              <div className="bar-bg">
+                <div className="exp-bar" style={{width: `${(status?.exp / (status?.level * 50)) * 100}%`}}></div>
+              </div>
+
+              <div style={{marginTop:'20px', fontSize:'14px'}}>
+                ⚔️ 공격력: <span style={{color:'#e06c75', fontWeight:'bold'}}>{status?.str || 10}</span>
+              </div>
             </div>
 
-            {/* EXP Bar (임시: 레벨*50 기준) */}
-            <div className="bar-container" style={{height:'10px', marginTop:'5px'}}>
-               <div 
-                className="exp-fill" 
-                style={{width: `${(status?.exp / (status?.level * 50)) * 100}%`}}
-              ></div>
+            {/* PC에서는 좌측, 모바일에서는 하단에 위치할 버튼들 */}
+            <div className="control-panel">
+              <button className="btn btn-atk" onClick={handleHunt}>⚔️ 사냥하기</button>
+              <button className="btn btn-rest" onClick={handleRest}>💤 휴식하기</button>
+              <button className="btn btn-out" onClick={handleLogout} style={{gridColumn:'span 2'}}>로그아웃</button>
             </div>
           </div>
 
-          {/* 로그창 */}
+          {/* 우측 패널: 로그창 */}
           <div className="log-window">
+            {logs.length === 0 && <div style={{textAlign:'center', color:'#555', marginTop:'50px'}}>- 모험의 기록이 여기에 표시됩니다 -</div>}
             {logs.map((log, idx) => (
-              <div key={idx} style={{marginBottom: '5px'}}>
-                {log.includes('[전투]') ? <span className="text-battle">{log}</span> : 
+              <div key={idx} style={{marginBottom: '8px'}}>
+                 {log.includes('[전투]') ? <span className="text-battle">{log}</span> : 
                  log.includes('[시스템]') ? <span className="text-system">{log}</span> : 
                  log}
               </div>
             ))}
             <div ref={logEndRef} />
-          </div>
-
-          {/* 컨트롤 패널 */}
-          <div className="control-panel">
-            <button className="btn-danger" onClick={handleHunt}>⚔️ 사냥하기</button>
-            <button className="btn-success" onClick={handleRest}>💤 휴식하기</button>
-            <button className="btn-warning full-width" onClick={handleLogout}>로그아웃</button>
           </div>
         </div>
       )}

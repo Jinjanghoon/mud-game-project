@@ -1,155 +1,210 @@
-/* 전체 배경: 눈이 편한 다크 그레이 */
+/* 1. 기본 설정 (파스텔 다크) */
 body {
   margin: 0;
   padding: 0;
-  background-color: #282c34;
+  background-color: #21252b; /* 더 짙은 배경 */
   color: #abb2bf;
-  font-family: 'Consolas', 'Courier New', monospace;
+  font-family: 'Pretendard', 'Malgun Gothic', 'Consolas', monospace;
   display: flex;
   justify-content: center;
+  align-items: center;
   min-height: 100vh;
 }
 
-/* 앱 전체 컨테이너 (PC에서는 중앙 정렬, 모바일은 꽉 차게) */
+/* 2. 메인 컨테이너 (앱 전체 틀) */
 .app-container {
   width: 100%;
-  max-width: 600px; /* PC에서 너무 넓어지지 않게 제한 */
-  background-color: #21252b;
-  min-height: 100vh;
+  height: 100vh; /* 모바일은 꽉 차게 */
+  background-color: #282c34;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  overflow: hidden;
 }
 
 /* 헤더 */
 .header {
-  padding: 20px;
+  padding: 15px;
   background-color: #1e2227;
   text-align: center;
-  border-bottom: 2px solid #3e4451;
+  border-bottom: 1px solid #181a1f;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
 }
 
 .title {
   color: #98c379; /* 파스텔 그린 */
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
+  letter-spacing: 2px;
 }
 
-/* 로그인/회원가입 박스 */
+/* =========================================
+   3. 로그인 화면 디자인
+   ========================================= */
+.login-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
 .login-box {
-  padding: 40px 20px;
+  width: 100%;
+  max-width: 400px; /* 로그인창은 너무 크면 안 예쁨 */
+  background-color: #2c313a;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
   text-align: center;
   display: flex;
   flex-direction: column;
   gap: 15px;
 }
 
-/* 입력창 스타일 */
+/* 입력창 */
 input {
-  background-color: #3b4048;
-  border: 1px solid #181a1f;
+  background-color: #21252b;
+  border: 1px solid #3e4451;
   color: white;
   padding: 15px;
   border-radius: 8px;
   font-size: 1rem;
   outline: none;
+  transition: 0.3s;
 }
 
 input:focus {
-  border-color: #61afef; /* 파스텔 블루 */
+  border-color: #61afef;
+  background-color: #282c34;
 }
 
-/* 버튼 공통 스타일 */
-button {
+/* =========================================
+   4. 인게임 레이아웃 (반응형 핵심)
+   ========================================= */
+.game-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: column; /* 모바일: 세로 배치 */
+  padding: 10px;
+  gap: 10px;
+  overflow: hidden; /* 스크롤은 내부에서만 */
+}
+
+/* 대시보드 (상태창 + 버튼들) */
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 상태창 */
+.status-card {
+  background-color: #2c313a;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.bar-bg {
+  background-color: #181a1f;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+
+.hp-bar { background: linear-gradient(90deg, #e06c75, #ff8e99); height: 100%; transition: width 0.3s;}
+.exp-bar { background: linear-gradient(90deg, #e5c07b, #ffdf9e); height: 100%; transition: width 0.3s;}
+
+/* 로그창 (메인 화면) */
+.log-window {
+  flex: 1; /* 남은 공간 다 차지 */
+  background-color: #1e2227;
+  border-radius: 12px;
+  padding: 20px;
+  overflow-y: auto;
+  font-family: 'D2Coding', 'Consolas', monospace;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  border: 1px solid #2c313a;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+}
+
+/* 버튼 그룹 */
+.control-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btn {
   padding: 15px;
   border: none;
   border-radius: 8px;
   font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
-  transition: 0.2s;
-  color: #282c34;
-}
-
-button:active {
-  transform: scale(0.98);
-}
-
-.btn-primary { background-color: #61afef; color: white; } /* 블루 */
-.btn-success { background-color: #98c379; color: white; } /* 그린 */
-.btn-danger  { background-color: #e06c75; color: white; } /* 레드 */
-.btn-warning { background-color: #e5c07b; color: #282c34;} /* 옐로우 */
-
-/* 게임 화면 레이아웃 */
-.game-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 10px;
-  gap: 10px;
-}
-
-/* 상태창 (HP바 등) */
-.status-bar {
-  background-color: #2c313a;
-  padding: 15px;
-  border-radius: 10px;
-  border: 1px solid #3e4451;
-}
-
-.bar-container {
-  background-color: #181a1f;
-  height: 20px;
-  border-radius: 10px;
-  margin-top: 5px;
-  overflow: hidden;
-  position: relative;
-}
-
-.hp-fill { background-color: #e06c75; height: 100%; transition: width 0.3s; }
-.exp-fill { background-color: #e5c07b; height: 100%; transition: width 0.3s; }
-
-.bar-text {
-  position: absolute;
-  width: 100%;
-  text-align: center;
-  font-size: 12px;
-  line-height: 20px;
   color: white;
-  text-shadow: 1px 1px 2px black;
+  transition: transform 0.1s, filter 0.2s;
 }
 
-/* 로그창 */
-.log-window {
-  flex: 1;
-  background-color: #181a1f;
-  border-radius: 10px;
-  padding: 15px;
-  overflow-y: auto;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  border: 1px solid #3e4451;
-  /* 모바일에서 스크롤 잘 되게 */
-  min-height: 300px;
-  max-height: 50vh; 
+.btn:active { transform: scale(0.96); }
+.btn:hover { filter: brightness(1.1); }
+
+.btn-atk { background-color: #e06c75; box-shadow: 0 4px 0 #b34e56; }
+.btn-rest { background-color: #98c379; box-shadow: 0 4px 0 #6f9c54; }
+.btn-out { background-color: #5c6370; color: #ccc; }
+
+.text-battle { color: #ff8e99; }
+.text-system { color: #c678dd; }
+.text-link { color: #61afef; cursor: pointer; text-decoration: underline; font-size: 0.9rem; }
+
+/* 스크롤바 디자인 */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-thumb { background: #3e4451; border-radius: 4px; }
+::-webkit-scrollbar-track { background: #1e2227; }
+
+
+/* =========================================
+   ★ PC 화면 (가로 768px 이상) 설정 ★
+   ========================================= */
+@media (min-width: 768px) {
+  .app-container {
+    height: 90vh; /* 화면 꽉 채우지 말고 약간 여백 */
+    max-width: 1000px; /* 최대 너비 제한 (너무 넓으면 보기 싫음) */
+    border-radius: 20px; /* 둥근 모서리 */
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5); /* 깊은 그림자 */
+  }
+
+  .game-layout {
+    flex-direction: row; /* ★ 가로 배치로 변경! ★ */
+    gap: 20px;
+    padding: 20px;
+  }
+
+  .dashboard {
+    width: 300px; /* 왼쪽 패널 고정 너비 */
+    flex-direction: column;
+  }
+
+  .status-card {
+    flex: 1; /* 위쪽 꽉 채우기 */
+  }
+
+  .control-panel {
+    grid-template-columns: 1fr; /* 버튼 세로로 쭉 */
+  }
+
+  .log-window {
+    flex: 2; /* 로그창을 더 넓게 */
+    height: 100%;
+  }
 }
-
-/* 스크롤바 꾸미기 */
-.log-window::-webkit-scrollbar { width: 8px; }
-.log-window::-webkit-scrollbar-thumb { background-color: #3e4451; border-radius: 4px; }
-
-/* 컨트롤 패널 (버튼들) */
-.control-panel {
-  display: grid;
-  grid-template-columns: 1fr 1fr; /* 버튼 2개 나란히 */
-  gap: 10px;
-  padding: 10px 0;
-}
-
-.full-width { grid-column: span 2; } /* 꽉 차는 버튼 */
-
-/* 텍스트 컬러 유틸 */
-.text-link { color: #61afef; cursor: pointer; text-decoration: underline; }
-.text-system { color: #c678dd; } /* 보라 */
-.text-battle { color: #e06c75; } /* 빨강 */
-.text-item { color: #56b6c2; }   /* 청록 */
