@@ -229,3 +229,49 @@ input:focus {
 }
 
 /* ... 나머지 버튼, 로그창 스타일은 기존 유지 ... */
+
+/* ... 기존 코드 아래에 추가 ... */
+
+/* 💀 기절(체력 0) 상태 오버레이 */
+.death-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(50, 0, 0, 0.85); /* 붉은 반투명 배경 */
+  z-index: 100; /* 맨 위에 뜨게 */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #ff4d4d;
+  text-align: center;
+  backdrop-filter: blur(5px); /* 배경 흐리게 */
+  animation: fadeIn 0.5s ease-out;
+}
+
+.death-title {
+  font-size: 3rem;
+  font-weight: bold;
+  margin-bottom: 20px;
+  text-shadow: 0 0 10px red;
+}
+
+.death-desc {
+  color: white;
+  margin-bottom: 30px;
+  font-size: 1.2rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 맥박 뛰는 애니메이션 (자동사냥 버튼용) */
+@keyframes pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(224, 108, 117, 0.7); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(224, 108, 117, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(224, 108, 117, 0); }
+}

@@ -25,17 +25,19 @@ function App() {
   useEffect(() => { inputPwRef.current = inputPw; }, [inputPw]);
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
 
-  // 🤖 자동 사냥
+  // 🤖 자동 사냥 (체력 체크 로직 개선)
   useEffect(() => {
     let timer;
     if (isAutoHunting) {
+      // 체력이 있을 때만 사냥
       if (status && status.hp > 0) {
         timer = setTimeout(() => {
           socket.emit('req_hunt', targetMonsterIdx);
         }, 1000); 
       } else {
+        // 💀 체력 부족 시: 경고창(alert) 대신 자동사냥 끄고 로그 출력
         setIsAutoHunting(false);
-        alert("체력이 부족하여 자동 사냥 종료!");
+        setLogs(prev => [...prev, "[시스템] ⛔ 체력이 부족하여 자동 사냥이 중단되었습니다."]);
       }
     }
     return () => clearTimeout(timer); 
@@ -69,7 +71,7 @@ function App() {
     socket.on('update_status', handleStatus);
     socket.on('login_success', handleLoginSuccess);
     socket.on('map_changed', handleMapChanged);
-    socket.on('login_fail', (msg) => alert(msg));
+    socket.on('login_fail', (msg) => alert(msg)); // 로그인 실패는 alert 유지
     socket.on('register_success', (msg) => { alert(msg); setIsLoginMode(true); });
 
     return () => {
@@ -96,10 +98,16 @@ function App() {
 
   const handleLogin = () => socket.emit('req_login', { id: inputId, pw: inputPw });
   const handleRegister = () => socket.emit('req_register', { id: inputId, pw: inputPw });
+  
   const toggleAutoHunt = () => {
-    if (status?.hp <= 0) return alert("체력 부족!");
+    if (status?.hp <= 0) {
+      // alert 대신 로그로 안내
+      setLogs(prev => [...prev, "[시스템] 체력이 없어 사냥을 시작할 수 없습니다."]);
+      return; 
+    }
     setIsAutoHunting(!isAutoHunting);
   };
+
   const handleRest = () => socket.emit('req_rest');
   const handleLogout = () => {
     localStorage.removeItem('savedId');
@@ -114,23 +122,29 @@ function App() {
   };
   const currentMap = mapList.find(m => m.id === currentMapId);
 
-  // ★ 퍼센트 계산 도우미 함수 ★
-  const getHpPercent = () => {
-    if (!status) return 0;
-    return Math.floor((status.hp / status.max_hp) * 100);
-  };
-
-  const getExpPercent = () => {
-    if (!status) return 0;
-    const maxExp = status.level * 50; // 서버 규칙과 동일하게
-    return Math.floor((status.exp / maxExp) * 100);
-  };
+  const getHpPercent = () => status ? Math.floor((status.hp / status.max_hp) * 100) : 0;
+  const getExpPercent = () => status ? Math.floor((status.exp / (status.level * 50)) * 100) : 0;
 
   return (
     <div className="app-container">
       <header className="header">
         <h1 className="title">TEXT FOREST ONLINE</h1>
       </header>
+
+      {/* 💀 기절 오버레이: 체력이 0일 때 화면을 덮음 */}
+      {isLoggedIn && status && status.hp <= 0 && (
+        <div className="death-overlay">
+          <div className="death-title">💀 탈 진 💀</div>
+          <div className="death-desc">체력이 모두 소진되어 더 이상 움직일 수 없습니다.</div>
+          <button 
+            className="btn btn-rest" 
+            style={{fontSize: '1.2rem', padding: '15px 30px', boxShadow: '0 0 20px #98c379'}}
+            onClick={handleRest}
+          >
+            💤 즉시 휴식하고 부활하기
+          </button>
+        </div>
+      )}
 
       {!isLoggedIn ? (
         <div className="login-wrapper">
@@ -158,8 +172,6 @@ function App() {
       ) : (
         <div className="game-layout">
           <div className="dashboard">
-            
-            {/* 상태창 */}
             <div className="status-card">
               <div className="stat-row">
                 <span style={{color:'#61afef', fontWeight:'bold'}}>{status?.name}</span>
@@ -167,33 +179,23 @@ function App() {
               </div>
               <div style={{color:'#e5c07b', fontWeight:'bold', marginBottom:'10px'}}>Lv.{status?.level}</div>
               
-              {/* ❤️ HP 게이지 */}
               <div style={{fontSize:'12px', color:'#ccc', marginBottom:'2px'}}>HP</div>
               <div className="bar-container">
                 <div className="hp-bar" style={{width: `${getHpPercent()}%`}}></div>
-                <div className="bar-text">
-                  {status?.hp} / {status?.max_hp} ({getHpPercent()}%)
-                </div>
+                <div className="bar-text">{status?.hp} / {status?.max_hp} ({getHpPercent()}%)</div>
               </div>
 
-              {/* ⭐ EXP 게이지 */}
               <div style={{fontSize:'12px', color:'#ccc', marginBottom:'2px'}}>EXP</div>
               <div className="bar-container">
                 <div className="exp-bar" style={{width: `${getExpPercent()}%`}}></div>
-                <div className="bar-text">
-                  {getExpPercent()}% ({status?.exp} / {status?.level * 50})
-                </div>
+                <div className="bar-text">{getExpPercent()}%</div>
               </div>
 
-              {/* 스텟 강화 UI */}
               <div style={{marginTop:'15px', borderTop:'1px solid #3e4451', paddingTop:'15px'}}>
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                    <span>⚔️ 공격력: <span style={{color:'#e06c75', fontWeight:'bold'}}>{status?.str}</span></span>
                    {status?.stat_points > 0 && (
-                     <button 
-                       onClick={handleStatUp}
-                       style={{padding:'4px 10px', background:'#e5c07b', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold', color:'#282c34'}}
-                     >+ 강화</button>
+                     <button onClick={handleStatUp} style={{padding:'4px 10px', background:'#e5c07b', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold', color:'#282c34'}}>+ 강화</button>
                    )}
                 </div>
                 {status?.stat_points > 0 && (
@@ -202,7 +204,6 @@ function App() {
               </div>
             </div>
 
-            {/* 사냥터 & 몬스터 목록 */}
             <div className="status-card" style={{marginTop:'10px', flex:1, display:'flex', flexDirection:'column'}}>
               <div style={{display:'flex', gap:'5px', overflowX:'auto', paddingBottom:'10px', marginBottom:'10px', borderBottom:'1px solid #3e4451'}}>
                 {mapList.map((map) => (
@@ -250,7 +251,6 @@ function App() {
               </div>
             </div>
 
-            {/* 컨트롤 */}
             <div className="control-panel" style={{marginTop:'10px'}}>
               <button 
                 className="btn" 
