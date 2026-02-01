@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import './App.css'; 
 
-// ✅ 본인의 Railway 주소 확인!
+// 🚨 Railway 주소 확인!
 const socket = io.connect("https://mud-game-project-production.up.railway.app");
 
 function App() {
@@ -15,7 +15,6 @@ function App() {
 
   const logEndRef = useRef(null);
 
-  // 로그 자동 스크롤
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
@@ -41,16 +40,8 @@ function App() {
     }
   }, [inputPw]);
 
-  const handleLogin = () => {
-    if (!inputId || !inputPw) return alert("입력 정보가 부족합니다.");
-    socket.emit('req_login', { id: inputId, pw: inputPw });
-  };
-
-  const handleRegister = () => {
-    if (!inputId || !inputPw) return alert("입력 정보가 부족합니다.");
-    socket.emit('req_register', { id: inputId, pw: inputPw });
-  };
-
+  const handleLogin = () => socket.emit('req_login', { id: inputId, pw: inputPw });
+  const handleRegister = () => socket.emit('req_register', { id: inputId, pw: inputPw });
   const handleHunt = () => socket.emit('req_hunt');
   const handleRest = () => socket.emit('req_rest');
   const handleLogout = () => {
@@ -61,25 +52,27 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* 헤더: 항상 화면 상단에 떠 있음 */}
       <header className="header">
-        <h1 className="title">🌲 텍스트의 숲 Online</h1>
+        <h1 className="title">TEXT FOREST ONLINE</h1>
       </header>
 
       {!isLoggedIn ? (
-        // [로그인 화면]
+        // [로그인 화면] - 박스 없이 전체 화면 중앙 배치
         <div className="login-wrapper">
           <div className="login-box">
-            <h2 style={{color:'white', margin:'0 0 20px 0'}}>
-              {isLoginMode ? "모험 시작" : "캐릭터 생성"}
+            <h2 style={{color:'white', marginBottom:'10px', fontSize:'2rem'}}>
+              {isLoginMode ? "ADVENTURE START" : "NEW CHARACTER"}
             </h2>
+            
             <input 
-              placeholder="닉네임 (ID)" 
+              placeholder="NICKNAME" 
               value={inputId}
               onChange={(e) => setInputId(e.target.value)}
             />
             <input 
               type="password" 
-              placeholder="비밀번호 (PW)" 
+              placeholder="PASSWORD" 
               value={inputPw}
               onChange={(e) => setInputPw(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && (isLoginMode ? handleLogin() : handleRegister())}
@@ -87,59 +80,57 @@ function App() {
 
             {isLoginMode ? (
               <>
-                <button className="btn btn-atk" style={{width:'100%', marginTop:'10px'}} onClick={handleLogin}>접속하기</button>
-                <p onClick={() => setIsLoginMode(false)} className="text-link" style={{marginTop:'15px'}}>
-                  처음이신가요? 회원가입
-                </p>
+                <button className="btn btn-atk" style={{marginTop:'10px'}} onClick={handleLogin}>접속하기</button>
+                <span onClick={() => setIsLoginMode(false)} className="text-link">
+                  새로운 모험가이신가요? 회원가입
+                </span>
               </>
             ) : (
               <>
-                <button className="btn btn-rest" style={{width:'100%', marginTop:'10px'}} onClick={handleRegister}>가입하기</button>
-                <p onClick={() => setIsLoginMode(true)} className="text-link" style={{marginTop:'15px'}}>
-                  이미 계정이 있나요? 로그인
-                </p>
+                <button className="btn btn-rest" style={{marginTop:'10px'}} onClick={handleRegister}>등록하기</button>
+                <span onClick={() => setIsLoginMode(true)} className="text-link">
+                  이미 계정이 있으신가요? 로그인
+                </span>
               </>
             )}
           </div>
         </div>
       ) : (
-        // [인게임 화면 - 반응형 레이아웃]
+        // [인게임 화면] - PC에선 넓게, 모바일에선 꽉 차게
         <div className="game-layout">
-          {/* 좌측 패널: 대시보드 */}
+          {/* 좌측: 상태창 + 컨트롤 */}
           <div className="dashboard">
             <div className="status-card">
               <div className="stat-row">
-                <span style={{color:'#61afef'}}>{status?.name}</span>
+                <span style={{color:'#61afef', fontWeight:'bold'}}>{status?.name}</span>
                 <span style={{color:'#e5c07b'}}>Lv.{status?.level}</span>
               </div>
               
-              <div style={{fontSize:'12px', color:'#aaa', marginBottom:'2px'}}>HP</div>
+              <div style={{fontSize:'12px', color:'#aaa', marginBottom:'4px'}}>HP ({status?.hp}/{status?.max_hp})</div>
               <div className="bar-bg">
                 <div className="hp-bar" style={{width: `${(status?.hp / status?.max_hp) * 100}%`}}></div>
               </div>
-              <div style={{textAlign:'right', fontSize:'12px', marginBottom:'10px'}}>{status?.hp} / {status?.max_hp}</div>
 
-              <div style={{fontSize:'12px', color:'#aaa', marginBottom:'2px'}}>EXP</div>
+              <div style={{fontSize:'12px', color:'#aaa', marginBottom:'4px'}}>EXP</div>
               <div className="bar-bg">
                 <div className="exp-bar" style={{width: `${(status?.exp / (status?.level * 50)) * 100}%`}}></div>
               </div>
 
-              <div style={{marginTop:'20px', fontSize:'14px'}}>
-                ⚔️ 공격력: <span style={{color:'#e06c75', fontWeight:'bold'}}>{status?.str || 10}</span>
+              <div style={{marginTop:'15px', borderTop:'1px solid #3e4451', paddingTop:'15px'}}>
+                 공격력 <span style={{color:'#e06c75', float:'right', fontWeight:'bold'}}>{status?.str || 10}</span>
               </div>
             </div>
 
-            {/* PC에서는 좌측, 모바일에서는 하단에 위치할 버튼들 */}
-            <div className="control-panel">
+            <div className="control-panel" style={{display:'flex', flexDirection:'column', gap:'10px'}}>
               <button className="btn btn-atk" onClick={handleHunt}>⚔️ 사냥하기</button>
               <button className="btn btn-rest" onClick={handleRest}>💤 휴식하기</button>
-              <button className="btn btn-out" onClick={handleLogout} style={{gridColumn:'span 2'}}>로그아웃</button>
+              <button className="btn btn-out" onClick={handleLogout}>로그아웃</button>
             </div>
           </div>
 
-          {/* 우측 패널: 로그창 */}
+          {/* 우측: 로그창 */}
           <div className="log-window">
-            {logs.length === 0 && <div style={{textAlign:'center', color:'#555', marginTop:'50px'}}>- 모험의 기록이 여기에 표시됩니다 -</div>}
+            {logs.length === 0 && <div style={{textAlign:'center', color:'#555', marginTop:'100px'}}>- 모험의 기록이 여기에 표시됩니다 -</div>}
             {logs.map((log, idx) => (
               <div key={idx} style={{marginBottom: '8px'}}>
                  {log.includes('[전투]') ? <span className="text-battle">{log}</span> : 

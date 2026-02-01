@@ -1,210 +1,170 @@
-/* 1. 기본 설정 (파스텔 다크) */
+/* 1. 전체 화면 설정 (배경색 하나로 통일) */
 body {
   margin: 0;
   padding: 0;
-  background-color: #21252b; /* 더 짙은 배경 */
+  background-color: #21252b; /* 메인 배경색 */
   color: #abb2bf;
   font-family: 'Pretendard', 'Malgun Gothic', 'Consolas', monospace;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
+  overflow: hidden; /* 스크롤 방지 */
 }
 
-/* 2. 메인 컨테이너 (앱 전체 틀) */
+/* 앱 컨테이너: 무조건 화면 꽉 채우기 */
 .app-container {
-  width: 100%;
-  height: 100vh; /* 모바일은 꽉 차게 */
-  background-color: #282c34;
+  width: 100vw;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  background-color: #21252b; /* 배경 통일 */
 }
 
-/* 헤더 */
+/* 헤더 (투명하게 처리하여 배경과 어우러지게) */
 .header {
-  padding: 15px;
-  background-color: #1e2227;
+  padding: 20px;
   text-align: center;
-  border-bottom: 1px solid #181a1f;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  position: absolute; /* 화면 위에 둥둥 뜨게 */
+  width: 100%;
+  top: 0;
+  z-index: 10;
 }
 
 .title {
-  color: #98c379; /* 파스텔 그린 */
-  margin: 0;
-  font-size: 1.2rem;
-  letter-spacing: 2px;
+  color: #98c379;
+  font-size: 1.5rem;
+  letter-spacing: 3px;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
 
 /* =========================================
-   3. 로그인 화면 디자인
+   2. 로그인 화면 (박스 제거 -> 전체 화면 중앙 정렬)
    ========================================= */
 .login-wrapper {
-  flex: 1;
+  width: 100%;
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 20px;
+  background: radial-gradient(circle at center, #2c313a 0%, #21252b 70%); /* 은은한 조명 효과 */
 }
 
 .login-box {
   width: 100%;
-  max-width: 400px; /* 로그인창은 너무 크면 안 예쁨 */
-  background-color: #2c313a;
-  padding: 40px;
-  border-radius: 16px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  max-width: 400px;
+  padding: 20px;
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 20px;
+  
+  /* ★ 핵심: 배경 박스 제거 ★ */
+  background-color: transparent; 
+  box-shadow: none; 
+  border: none;
 }
 
-/* 입력창 */
+/* 입력창 스타일 (배경 위에 잘 보이게) */
 input {
-  background-color: #21252b;
+  background-color: rgba(0, 0, 0, 0.3); /* 반투명 검정 */
   border: 1px solid #3e4451;
   color: white;
-  padding: 15px;
+  padding: 18px;
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: 1.1rem;
   outline: none;
   transition: 0.3s;
+  text-align: center; /* 입력 글자 가운데 정렬 */
 }
 
 input:focus {
   border-color: #61afef;
-  background-color: #282c34;
+  background-color: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 15px rgba(97, 175, 239, 0.3); /* 빛나는 효과 */
 }
 
 /* =========================================
-   4. 인게임 레이아웃 (반응형 핵심)
+   3. 인게임 화면 (게임할 땐 UI 잡기)
    ========================================= */
 .game-layout {
-  flex: 1;
+  width: 100%;
+  height: 100%;
   display: flex;
-  flex-direction: column; /* 모바일: 세로 배치 */
-  padding: 10px;
-  gap: 10px;
-  overflow: hidden; /* 스크롤은 내부에서만 */
+  flex-direction: column;
+  padding: 80px 20px 20px 20px; /* 헤더 공간 확보 */
+  box-sizing: border-box;
+  max-width: 1400px; /* PC에서 너무 퍼지지 않게 중앙 정렬 제한 */
+  margin: 0 auto;
 }
 
-/* 대시보드 (상태창 + 버튼들) */
+/* 대시보드 (상태창) */
 .dashboard {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 15px;
+  margin-bottom: 15px;
 }
 
-/* 상태창 */
 .status-card {
-  background-color: #2c313a;
-  padding: 15px;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-}
-
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 0.9rem;
-  font-weight: bold;
-}
-
-.bar-bg {
-  background-color: #181a1f;
-  height: 12px;
-  border-radius: 6px;
-  overflow: hidden;
-  margin-bottom: 5px;
-}
-
-.hp-bar { background: linear-gradient(90deg, #e06c75, #ff8e99); height: 100%; transition: width 0.3s;}
-.exp-bar { background: linear-gradient(90deg, #e5c07b, #ffdf9e); height: 100%; transition: width 0.3s;}
-
-/* 로그창 (메인 화면) */
-.log-window {
-  flex: 1; /* 남은 공간 다 차지 */
-  background-color: #1e2227;
-  border-radius: 12px;
+  background-color: rgba(44, 49, 58, 0.8); /* 반투명 카드 */
   padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #3e4451;
+}
+
+.log-window {
+  flex: 1;
+  background-color: rgba(30, 34, 39, 0.9);
+  border-radius: 12px;
+  padding: 25px;
   overflow-y: auto;
   font-family: 'D2Coding', 'Consolas', monospace;
-  font-size: 0.95rem;
-  line-height: 1.7;
-  border: 1px solid #2c313a;
-  box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+  font-size: 1rem;
+  line-height: 1.8;
+  border: 1px solid #3e4451;
 }
 
-/* 버튼 그룹 */
-.control-panel {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
+/* 버튼 스타일 */
 .btn {
-  padding: 15px;
+  padding: 18px;
   border: none;
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: bold;
   cursor: pointer;
   color: white;
-  transition: transform 0.1s, filter 0.2s;
+  transition: 0.2s;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
 }
 
-.btn:active { transform: scale(0.96); }
-.btn:hover { filter: brightness(1.1); }
+.btn:active { transform: scale(0.95); }
+.btn-atk { background: linear-gradient(135deg, #e06c75, #c14650); }
+.btn-rest { background: linear-gradient(135deg, #98c379, #6f9c54); }
+.btn-out { background-color: transparent; border: 1px solid #5c6370; color: #aaa; box-shadow: none;}
 
-.btn-atk { background-color: #e06c75; box-shadow: 0 4px 0 #b34e56; }
-.btn-rest { background-color: #98c379; box-shadow: 0 4px 0 #6f9c54; }
-.btn-out { background-color: #5c6370; color: #ccc; }
-
-.text-battle { color: #ff8e99; }
-.text-system { color: #c678dd; }
-.text-link { color: #61afef; cursor: pointer; text-decoration: underline; font-size: 0.9rem; }
-
-/* 스크롤바 디자인 */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-thumb { background: #3e4451; border-radius: 4px; }
-::-webkit-scrollbar-track { background: #1e2227; }
-
-
-/* =========================================
-   ★ PC 화면 (가로 768px 이상) 설정 ★
-   ========================================= */
+/* PC 전용 레이아웃 (가로 배치) */
 @media (min-width: 768px) {
-  .app-container {
-    height: 90vh; /* 화면 꽉 채우지 말고 약간 여백 */
-    max-width: 1000px; /* 최대 너비 제한 (너무 넓으면 보기 싫음) */
-    border-radius: 20px; /* 둥근 모서리 */
-    box-shadow: 0 20px 50px rgba(0,0,0,0.5); /* 깊은 그림자 */
-  }
-
   .game-layout {
-    flex-direction: row; /* ★ 가로 배치로 변경! ★ */
-    gap: 20px;
-    padding: 20px;
+    flex-direction: row;
+    gap: 30px;
+    padding: 100px 40px 40px 40px;
   }
-
+  
   .dashboard {
-    width: 300px; /* 왼쪽 패널 고정 너비 */
-    flex-direction: column;
-  }
-
-  .status-card {
-    flex: 1; /* 위쪽 꽉 채우기 */
+    width: 320px;
+    margin-bottom: 0;
   }
 
   .control-panel {
-    grid-template-columns: 1fr; /* 버튼 세로로 쭉 */
-  }
-
-  .log-window {
-    flex: 2; /* 로그창을 더 넓게 */
-    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
   }
 }
+
+/* 텍스트 컬러 */
+.stat-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.1rem; }
+.bar-bg { background: rgba(0,0,0,0.5); height: 16px; border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+.hp-bar { background: linear-gradient(90deg, #e06c75, #ff8e99); height: 100%; transition: width 0.3s; }
+.exp-bar { background: linear-gradient(90deg, #e5c07b, #ffdf9e); height: 100%; transition: width 0.3s; }
+
+.text-battle { color: #ff8e99; text-shadow: 0 0 5px rgba(255, 142, 153, 0.3); }
+.text-system { color: #d19a66; }
+.text-link { color: #56b6c2; cursor: pointer; margin-top: 20px; display: inline-block; font-size: 0.9rem;}
