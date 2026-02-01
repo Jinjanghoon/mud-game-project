@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const { Pool } = require('pg'); // DB 연동 도구
+const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
@@ -16,16 +16,17 @@ const io = new Server(server, {
   }
 });
 
-// ✅ DB 연결 설정 (Railway가 주는 주소를 자동으로 가져옴)
+// ✅ DB 연결 설정 (Railway 환경변수 사용)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // 클라우드 DB 접속시 필수 옵션
+  ssl: { rejectUnauthorized: false }
 });
 
-// ✅ 서버 켜질 때 '유저 테이블'이 없으면 만들기
+// ✅ 서버 시작 시 테이블 확인 (비밀번호 컬럼 포함)
 pool.query(`
   CREATE TABLE IF NOT EXISTS players (
     name VARCHAR(50) PRIMARY KEY,
+    password VARCHAR(255),
     level INT DEFAULT 1,
     hp INT DEFAULT 100,
     max_hp INT DEFAULT 100,
@@ -40,44 +41,60 @@ let connectedPlayers = {};
 io.on('connection', (socket) => {
   console.log(`접속: ${socket.id}`);
 
-  // 1. 게임 입장 (DB에서 불러오기)
-  socket.on('join_game', async (nickname) => {
+  // 1. 회원가입 요청
+  socket.on('req_register', async ({ id, pw }) => {
     try {
-      // DB에 있나 확인
-      const res = await pool.query('SELECT * FROM players WHERE name = $1', [nickname]);
-      
-      let playerData;
-      if (res.rows.length > 0) {
-        // 있으면 불러오기
-        playerData = res.rows[0];
-        socket.emit('log_message', `[시스템] 돌아오셨군요, ${nickname}님! (LV.${playerData.level})`);
-      } else {
-        // 없으면 새로 만들기
-        await pool.query('INSERT INTO players (name) VALUES ($1)', [nickname]);
-        playerData = { name: nickname, level: 1, hp: 100, max_hp: 100, exp: 0 };
-        socket.emit('log_message', `[시스템] ${nickname}님, 텍스트의 숲에 오신 것을 환영합니다.`);
+      // 닉네임 중복 체크
+      const check = await pool.query('SELECT * FROM players WHERE name = $1', [id]);
+      if (check.rows.length > 0) {
+        socket.emit('login_fail', '이미 존재하는 닉네임입니다.');
+        return;
       }
-
-      // 메모리에 등록 및 상태 전송
-      connectedPlayers[socket.id] = playerData;
-      socket.emit('update_status', playerData);
-
+      // 신규 유저 생성 (비밀번호 포함)
+      await pool.query('INSERT INTO players (name, password) VALUES ($1, $2)', [id, pw]);
+      socket.emit('register_success', `가입 완료! 로그인해주세요.`);
     } catch (err) {
       console.error(err);
-      socket.emit('log_message', `[시스템] 데이터 로딩 실패!`);
+      socket.emit('login_fail', '회원가입 중 오류 발생');
     }
   });
 
-  // 2. 연결 끊기 (자동 저장)
+  // 2. 로그인 요청
+  socket.on('req_login', async ({ id, pw }) => {
+    try {
+      // 아이디와 비밀번호 확인
+      const res = await pool.query('SELECT * FROM players WHERE name = $1 AND password = $2', [id, pw]);
+      
+      if (res.rows.length > 0) {
+        // 로그인 성공
+        const playerData = res.rows[0];
+        connectedPlayers[socket.id] = playerData;
+        
+        socket.emit('login_success', playerData);
+        socket.emit('log_message', `[시스템] 환영합니다, ${playerData.name}님! (LV.${playerData.level})`);
+      } else {
+        // 로그인 실패
+        socket.emit('login_fail', '아이디 또는 비밀번호가 틀렸습니다.');
+      }
+    } catch (err) {
+      console.error(err);
+      socket.emit('login_fail', '로그인 처리 중 오류 발생');
+    }
+  });
+
+  // 3. 연결 종료 (자동 저장)
   socket.on('disconnect', async () => {
     const player = connectedPlayers[socket.id];
     if (player) {
-      // 나갈 때 DB에 최신 정보 저장
-      await pool.query(
-        'UPDATE players SET level=$1, hp=$2, exp=$3 WHERE name=$4',
-        [player.level, player.hp, player.exp, player.name]
-      );
-      console.log(`${player.name} 저장 완료 및 퇴장`);
+      try {
+        await pool.query(
+          'UPDATE players SET level=$1, hp=$2, exp=$3 WHERE name=$4',
+          [player.level, player.hp, player.exp, player.name]
+        );
+        console.log(`${player.name} 저장 완료 및 퇴장`);
+      } catch (err) {
+        console.error('저장 실패:', err);
+      }
       delete connectedPlayers[socket.id];
     }
   });
